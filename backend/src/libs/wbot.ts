@@ -104,7 +104,6 @@ export const initWbot = async (whatsapp: Whatsapp): Promise<Session> => {
 
       wbot.on("ready", async () => {
         logger.info(`Session: ${sessionName} READY`);
-
         await whatsapp.update({
           status: "CONNECTED",
           qrcode: "",
@@ -116,14 +115,9 @@ export const initWbot = async (whatsapp: Whatsapp): Promise<Session> => {
           session: whatsapp
         });
 
-        const sessionIndex = sessions.findIndex(s => s.id === whatsapp.id);
-        if (sessionIndex === -1) {
-          wbot.id = whatsapp.id;
-          sessions.push(wbot);
-        }
-
-        wbot.sendPresenceAvailable();
-        await syncUnreadMessages(wbot);
+        const wbotMessageListener = require("../services/WbotServices/wbotMessageListener").wbotMessageListener;
+        wbotMessageListener(wbot);
+        logger.info(`Session: ${sessionName} MESSAGE LISTENERS INITIALIZED`);
 
         resolve(wbot);
       });

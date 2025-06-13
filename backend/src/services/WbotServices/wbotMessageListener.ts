@@ -142,11 +142,14 @@ const processOpenAIMessage = async (msg: string): Promise<string> => {
     });
 
     if (!settings) {
-      console.log('No settings found in database');
+      console.error('No OpenAI settings found in database');
       return "OpenAI configuration not found";
     }
 
-    console.log('Raw settings from database:', settings.value);
+    console.log('Found OpenAI settings:', {
+      hasSettings: !!settings,
+      rawValue: settings.value
+    });
     
     let parsedSettings;
     try {
@@ -154,6 +157,7 @@ const processOpenAIMessage = async (msg: string): Promise<string> => {
       console.log('Parsed settings:', {
         hasKey: !!parsedSettings.key,
         model: parsedSettings.model,
+        keyLength: parsedSettings.key?.length,
         hasSystemMessage: !!parsedSettings.systemMessage
       });
     } catch (parseError) {
@@ -164,7 +168,7 @@ const processOpenAIMessage = async (msg: string): Promise<string> => {
     const { key, model, systemMessage } = parsedSettings;
 
     if (!key) {
-      console.log('API key is missing in settings');
+      console.error('API key is missing in settings');
       return "OpenAI API key not configured";
     }
 
@@ -190,7 +194,8 @@ const processOpenAIMessage = async (msg: string): Promise<string> => {
 
       console.log('Received response from OpenAI:', {
         hasChoices: !!completion.choices,
-        choicesLength: completion.choices?.length
+        choicesLength: completion.choices?.length,
+        responseLength: completion.choices[0]?.message?.content?.length
       });
 
       const response = completion.choices[0]?.message?.content || "No response generated";
@@ -403,16 +408,59 @@ const isValidMsg = (msg: WbotMessage): boolean => {
   return false;
 };
 
+const wbotMessageListener = (wbot: Session): void => {
+  console.log('\n=== Setting up WhatsApp message listeners ===');
+
+  wbot.on("message_create", async (msg: WbotMessage) => {
+    console.log('\n=== New Message Create Event ===');
+    console.log('Message ID:', msg.id.id);
+    console.log('Message Type:', msg.type);
+    console.log('From:', msg.from);
+    console.log('To:', msg.to);
+    console.log('Body:', msg.body);
+    
+    if (!isValidMsg(msg)) {
+      console.log('Invalid message, skipping');
+      return;
+    }
+    
+    try {
+      await handleMessage(msg, wbot);
+    } catch (error) {
+      console.error('Error handling message:', error);
+    }
+  });
+
+  wbot.on("message", async (msg: WbotMessage) => {
+    console.log('\n=== New Message Event ===');
+    console.log('Message ID:', msg.id.id);
+    console.log('Message Type:', msg.type);
+    console.log('From:', msg.from);
+    console.log('To:', msg.to);
+    console.log('Body:', msg.body);
+    
+    if (!isValidMsg(msg)) {
+      console.log('Invalid message, skipping');
+      return;
+    }
+    
+    try {
+      await handleMessage(msg, wbot);
+    } catch (error) {
+      console.error('Error handling message:', error);
+    }
+  });
+
+  console.log('Message listeners setup complete');
+};
+
 const handleMessage = async (
   msg: WbotMessage,
   wbot: Session
 ): Promise<void> => {
-  if (!isValidMsg(msg)) {
-    return;
-  }
-
+  console.log('\n=== Processing Message ===');
+  
   try {
-    console.log('\n=== New Message Handling Started ===');
     let msgContact: WbotContact;
     let groupContact: Contact | undefined;
 
@@ -422,17 +470,21 @@ const handleMessage = async (
         return;
       }
 
-      if (!msg.hasMedia && msg.type !== "location" && msg.type !== "chat" && msg.type !== "vcard") {
-        console.log('Message is not media/location/chat/vcard, skipping');
-        return;
-      }
-
       msgContact = await wbot.getContactById(msg.to);
     } else {
       msgContact = await msg.getContact();
     }
 
+    console.log('Contact:', {
+      name: msgContact.name || msgContact.pushname || msgContact.id.user,
+      number: msgContact.id.user
+    });
+
     const chat = await msg.getChat();
+    console.log('Chat:', {
+      name: chat.name,
+      isGroup: chat.isGroup
+    });
 
     if (chat.isGroup) {
       let msgGroupContact;
@@ -616,41 +668,6 @@ const handleMsgAck = async (msg: WbotMessage, ack: MessageAck) => {
     Sentry.captureException(err);
     logger.error(err instanceof Error ? err : { error: String(err) });
   }
-};
-
-const wbotMessageListener = (wbot: Session): void => {
-  console.log('=== Setting up WhatsApp message listeners ===');
-
-  wbot.on("message_create", async (msg: WbotMessage) => {
-    console.log('\n=== Message Create Event Triggered ===');
-    console.log('Message type:', msg.type);
-    console.log('Message body:', msg.body);
-    handleMessage(msg, wbot);
-  });
-
-  wbot.on("message", async (msg: WbotMessage) => {
-    console.log('\n=== Message Event Triggered ===');
-    console.log('Message type:', msg.type);
-    console.log('Message body:', msg.body);
-    handleMessage(msg, wbot);
-  });
-
-  wbot.on("media_uploaded", async (msg: WbotMessage) => {
-    console.log('\n=== Media Uploaded Event Triggered ===');
-    handleMessage(msg, wbot);
-  });
-
-  wbot.on("message_ack", async (msg: WbotMessage, ack: MessageAck) => {
-    console.log('\n=== Message ACK Event Triggered ===');
-    console.log('ACK Status:', ack);
-    try {
-      await handleMsgAck(msg, ack || 0); // Asegurarse de que ack nunca sea null
-    } catch (err) {
-      console.error('Error handling message ack:', err);
-    }
-  });
-
-  console.log('=== WhatsApp message listeners setup complete ===');
 };
 
 export { wbotMessageListener, handleMessage };
