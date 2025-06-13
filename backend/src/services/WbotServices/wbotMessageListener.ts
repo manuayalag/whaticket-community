@@ -4,6 +4,7 @@ import { writeFile } from "fs";
 import fetch from "node-fetch";
 import { OpenAI } from "openai";
 import Setting from "../../models/Setting";
+import { logToFile, clearLogFile } from "../../utils/fileLogger";
 import {
   Message as WbotMessage,
   Client
@@ -18,27 +19,30 @@ type Session = Client;
 
 const TARGET_NUMBER = "595984848082";
 
+// Clear log file on start
+clearLogFile();
+
 // Simple implementation focusing only on the core functionality
 export const wbotMessageListener = (wbot: Session): void => {
-  console.log("=========================================");
-  console.log("INICIANDO LISTENER DE MENSAJES");
-  console.log("=========================================");
+  logToFile("=========================================");
+  logToFile("INICIANDO LISTENER DE MENSAJES");
+  logToFile("=========================================");
 
   // Process only messages from our target
   wbot.on("message", async (msg) => {
     try {
-      console.log("=========================================");
-      console.log("NUEVO MENSAJE RECIBIDO");
-      console.log("De:", msg.from);
-      console.log("Contenido:", msg.body);
+      logToFile("=========================================");
+      logToFile("NUEVO MENSAJE RECIBIDO");
+      logToFile(`De: ${msg.from}`);
+      logToFile(`Contenido: ${msg.body}`);
 
       // Check if it's our target number
       const contactNumber = msg.from.replace("@c.us", "");
-      console.log("Número extraído:", contactNumber);
+      logToFile(`Número extraído: ${contactNumber}`);
 
       if (contactNumber === TARGET_NUMBER) {
-        console.log("¡MENSAJE DE NÚMERO OBJETIVO DETECTADO!");
-        console.log("Procesando con OpenAI...");
+        logToFile("¡MENSAJE DE NÚMERO OBJETIVO DETECTADO!");
+        logToFile("Procesando con OpenAI...");
 
         try {
           const settings = await Setting.findOne({
@@ -46,23 +50,23 @@ export const wbotMessageListener = (wbot: Session): void => {
           });
 
           if (!settings) {
-            console.log("ERROR: No se encontró configuración de OpenAI");
+            logToFile("ERROR: No se encontró configuración de OpenAI");
             await wbot.sendMessage(msg.from, "Error: OpenAI no está configurado");
             return;
           }
 
-          console.log("Configuración de OpenAI encontrada:", settings.value);
+          logToFile(`Configuración de OpenAI encontrada: ${settings.value}`);
           const parsedSettings = JSON.parse(settings.value);
           
           if (!parsedSettings.key) {
-            console.log("ERROR: No se encontró API key de OpenAI");
+            logToFile("ERROR: No se encontró API key de OpenAI");
             await wbot.sendMessage(msg.from, "Error: Falta API key de OpenAI");
             return;
           }
 
           const openai = new OpenAI({ apiKey: parsedSettings.key });
           
-          console.log("Enviando mensaje a OpenAI:", msg.body);
+          logToFile(`Enviando mensaje a OpenAI: ${msg.body}`);
           const completion = await openai.chat.completions.create({
             messages: [
               { 
@@ -80,29 +84,29 @@ export const wbotMessageListener = (wbot: Session): void => {
           });
 
           const response = completion.choices[0]?.message?.content || "No se generó respuesta";
-          console.log("Respuesta de OpenAI:", response);
+          logToFile(`Respuesta de OpenAI: ${response}`);
 
-          console.log("Enviando respuesta al usuario...");
+          logToFile("Enviando respuesta al usuario...");
           await wbot.sendMessage(msg.from, `\u200e${response}`);
-          console.log("Respuesta enviada exitosamente");
+          logToFile("Respuesta enviada exitosamente");
 
-        } catch (error) {
-          console.error("ERROR al procesar con OpenAI:", error);
+        } catch (error: any) {
+          logToFile(`ERROR al procesar con OpenAI: ${error?.message || 'Error desconocido'}`);
           try {
-            await wbot.sendMessage(msg.from, `Error al procesar con IA: ${error.message || "Error desconocido"}`);
-          } catch (sendError) {
-            console.error("ERROR al enviar mensaje de error:", sendError);
+            await wbot.sendMessage(msg.from, `Error al procesar con IA: ${error?.message || "Error desconocido"}`);
+          } catch (sendError: any) {
+            logToFile(`ERROR al enviar mensaje de error: ${sendError?.message || 'Error desconocido'}`);
           }
         }
       } else {
-        console.log("Mensaje no es del número objetivo, ignorando");
+        logToFile("Mensaje no es del número objetivo, ignorando");
       }
 
-    } catch (err) {
-      console.error("ERROR general al procesar mensaje:", err);
+    } catch (err: any) {
+      logToFile(`ERROR general al procesar mensaje: ${err?.message || 'Error desconocido'}`);
     }
   });
 
-  console.log("LISTENER DE MENSAJES INICIALIZADO");
-  console.log("=========================================");
+  logToFile("LISTENER DE MENSAJES INICIALIZADO");
+  logToFile("=========================================");
 };
