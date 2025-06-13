@@ -41,6 +41,7 @@ const OpenAISettings = () => {
     model: "gpt-3.5-turbo",
     temperature: 0.7,
     maxTokens: 500,
+    systemMessage: "Eres un asistente amable y profesional.",
   });
   const [loading, setLoading] = useState(false);
 
@@ -131,6 +132,18 @@ const OpenAISettings = () => {
             inputProps={{ min: "1", max: "4000" }}
             required
             fullWidth
+          />
+          <TextField
+            label="Mensaje del Sistema"
+            name="systemMessage"
+            value={settings.systemMessage}
+            onChange={handleChange}
+            variant="outlined"
+            multiline
+            rows={4}
+            required
+            fullWidth
+            helperText="Este mensaje define el comportamiento del asistente"
           />
           <div className={classes.btnWrapper}>
             <Button

@@ -8,6 +8,7 @@ interface OpenAISettings {
   model: string;
   temperature: number;
   maxTokens: number;
+  systemMessage: string;
 }
 
 export const getSettings = async (req: Request, res: Response): Promise<Response> => {
@@ -20,7 +21,8 @@ export const getSettings = async (req: Request, res: Response): Promise<Response
       key: '',
       model: 'gpt-3.5-turbo',
       temperature: 0.7,
-      maxTokens: 500
+      maxTokens: 500,
+      systemMessage: 'Eres un asistente amable y profesional.'
     });
   }
 
@@ -28,17 +30,17 @@ export const getSettings = async (req: Request, res: Response): Promise<Response
 };
 
 export const saveSettings = async (req: Request, res: Response): Promise<Response> => {
-  const { key, model, temperature, maxTokens }: OpenAISettings = req.body;
+  const { key, model, temperature, maxTokens, systemMessage }: OpenAISettings = req.body;
 
   const [settings] = await Setting.findOrCreate({
     where: { key: 'openai' },
     defaults: {
-      value: JSON.stringify({ key, model, temperature, maxTokens })
+      value: JSON.stringify({ key, model, temperature, maxTokens, systemMessage })
     }
   });
 
   if (settings) {
-    settings.value = JSON.stringify({ key, model, temperature, maxTokens });
+    settings.value = JSON.stringify({ key, model, temperature, maxTokens, systemMessage });
     await settings.save();
   }
 
@@ -55,7 +57,7 @@ export const sendMessage = async (req: Request, res: Response): Promise<Response
     throw new AppError('OpenAI settings not found', 404);
   }
 
-  const { key, model, temperature, maxTokens } = JSON.parse(settings.value);
+  const { key, model, temperature, maxTokens, systemMessage } = JSON.parse(settings.value);
 
   if (!key) {
     throw new AppError('OpenAI API key not configured', 400);
@@ -65,7 +67,10 @@ export const sendMessage = async (req: Request, res: Response): Promise<Response
 
   try {
     const completion = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: message }],
+      messages: [
+        { role: 'system', content: systemMessage || 'Eres un asistente amable y profesional.' },
+        { role: 'user', content: message }
+      ],
       model: model || 'gpt-3.5-turbo',
       temperature: temperature || 0.7,
       max_tokens: maxTokens || 500
