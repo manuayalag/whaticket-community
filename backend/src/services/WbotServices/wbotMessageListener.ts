@@ -233,19 +233,45 @@ const verifyMessage = async (
     !msg.body.startsWith("\u200e")
   ) {
     try {
+      console.log('\n=== Processing message for OpenAI ===');
+      console.log('From contact:', contact.number);
+      console.log('Message:', msg.body);
+
       const aiResponse = await processOpenAIMessage(msg.body);
+      console.log('AI Response received:', aiResponse);
+
+      // Get the WhatsApp instance
       const wbot = await GetTicketWbot(ticket);
       
-      if (wbot) {
-        await wbot.sendMessage(
-          `${contact.number}@${ticket.isGroup ? "g" : "c"}.us`,
-          `\u200e${aiResponse}`
-        ).catch((err: Error) => {
-          console.error("Error sending AI response:", err);
+      if (!wbot) {
+        console.error('Could not get WhatsApp instance');
+        return;
+      }
+
+      try {
+        // Construct the chat ID properly
+        const chatId = `${contact.number}@${ticket.isGroup ? "g" : "c"}.us`;
+        console.log('Attempting to send message to:', chatId);
+
+        // Send the message
+        const sentMessage = await wbot.sendMessage(
+          chatId,
+          `\u200e${aiResponse}`,
+          { sendSeen: true }
+        );
+
+        console.log('Message sent successfully:', sentMessage.id.id);
+      } catch (sendError) {
+        console.error('Error sending WhatsApp message:', {
+          error: sendError.message,
+          stack: sendError.stack
         });
       }
     } catch (error) {
-      console.error("Error processing AI response:", error);
+      console.error('Error in AI processing:', {
+        error: error.message,
+        stack: error.stack
+      });
     }
   }
 
