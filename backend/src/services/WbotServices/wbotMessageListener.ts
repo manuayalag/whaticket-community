@@ -2,8 +2,8 @@ import { join } from "path";
 import { promisify } from "util";
 import { writeFile } from "fs";
 import * as Sentry from "@sentry/node";
-import fetch from "node-fetch";
 import { OpenAI } from "openai";
+import fetch from "node-fetch";
 import GetTicketWbot from "../../helpers/GetTicketWbot";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
@@ -11,14 +11,7 @@ import Message from "../../models/Message";
 import Setting from "../../models/Setting";
 import { getIO } from "../../libs/socket";
 import CreateMessageService from "../MessageServices/CreateMessageService";
-import { debounce } from "../../helpers/Debounce";
 import { logger } from "../../utils/logger";
-import CreateContactService from "../ContactServices/CreateContactService";
-import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
-import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
-import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
-import UpdateTicketService from "../TicketServices/UpdateTicketService";
-import formatBody from "../../helpers/Mustache";
 import {
   Contact as WbotContact,
   Message as WbotMessage,
@@ -28,7 +21,7 @@ import {
 
 type Session = Client;
 
-// Configurar fetch globalmente para OpenAI
+// Set fetch globally for OpenAI
 if (!globalThis.fetch) {
   globalThis.fetch = fetch;
 }
@@ -132,56 +125,34 @@ const verifyMediaMessage = async (
 };
 
 const processOpenAIMessage = async (msg: string): Promise<string> => {
-  console.log('\n=== Starting OpenAI Message Processing ===');
-  console.log('Received message:', msg);
+  logger.info("=== Processing OpenAI Message ===");
+  logger.info(`Message: ${msg}`);
   
   try {
-    console.log('Fetching OpenAI settings from database...');
     const settings = await Setting.findOne({
       where: { key: 'openai' }
     });
 
     if (!settings) {
-      console.error('No OpenAI settings found in database');
+      logger.error("OpenAI settings not found");
       return "OpenAI configuration not found";
     }
 
-    console.log('Found OpenAI settings:', {
-      hasSettings: !!settings,
-      rawValue: settings.value
-    });
+    logger.info("Found OpenAI settings");
     
-    let parsedSettings;
-    try {
-      parsedSettings = JSON.parse(settings.value);
-      console.log('Parsed settings:', {
-        hasKey: !!parsedSettings.key,
-        model: parsedSettings.model,
-        keyLength: parsedSettings.key?.length,
-        hasSystemMessage: !!parsedSettings.systemMessage
-      });
-    } catch (parseError) {
-      console.error('Error parsing settings:', parseError);
-      return "Error parsing OpenAI configuration";
-    }
-
+    const parsedSettings = JSON.parse(settings.value);
     const { key, model, systemMessage } = parsedSettings;
 
     if (!key) {
-      console.error('API key is missing in settings');
+      logger.error("OpenAI API key not found");
       return "OpenAI API key not configured";
     }
 
-    console.log('Initializing OpenAI with config:', {
-      model: model || 'gpt-3.5-turbo',
-      messageLength: msg.length,
-      keyLength: key.length
-    });
-
+    logger.info("Initializing OpenAI client");
     const openai = new OpenAI({ apiKey: key });
 
     try {
-      console.log('Sending request to OpenAI...');
+      logger.info("Sending request to OpenAI");
       const completion = await openai.chat.completions.create({
         messages: [
           { role: 'system', content: systemMessage || 'Eres un asistente amable y profesional.' },
@@ -192,29 +163,16 @@ const processOpenAIMessage = async (msg: string): Promise<string> => {
         max_tokens: 500
       });
 
-      console.log('Received response from OpenAI:', {
-        hasChoices: !!completion.choices,
-        choicesLength: completion.choices?.length,
-        responseLength: completion.choices[0]?.message?.content?.length
-      });
-
       const response = completion.choices[0]?.message?.content || "No response generated";
-      console.log('Final response:', response);
+      logger.info(`OpenAI Response: ${response}`);
       return response;
 
     } catch (error) {
-      console.error('OpenAI API Error:', {
-        message: error instanceof Error ? error.message : String(error),
-        type: error instanceof Error ? error.constructor.name : typeof error,
-        stack: error instanceof Error ? error.stack : undefined
-      });
+      logger.error("OpenAI API Error:", error);
       return `Error calling OpenAI API: ${error instanceof Error ? error.message : String(error)}`;
     }
   } catch (error) {
-    console.error('Unexpected error:', {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
-    });
+    logger.error("Error processing message:", error);
     return `Error processing message with AI: ${error instanceof Error ? error.message : String(error)}`;
   }
 };
@@ -408,266 +366,48 @@ const isValidMsg = (msg: WbotMessage): boolean => {
   return false;
 };
 
-const wbotMessageListener = (wbot: Session): void => {
-  console.log('\n=== Setting up WhatsApp message listeners ===');
-
-  wbot.on("message_create", async (msg: WbotMessage) => {
-    console.log('\n=== New Message Create Event ===');
-    console.log('Message ID:', msg.id.id);
-    console.log('Message Type:', msg.type);
-    console.log('From:', msg.from);
-    console.log('To:', msg.to);
-    console.log('Body:', msg.body);
-    
-    if (!isValidMsg(msg)) {
-      console.log('Invalid message, skipping');
-      return;
-    }
-    
-    try {
-      await handleMessage(msg, wbot);
-    } catch (error) {
-      console.error('Error handling message:', error);
-    }
-  });
+export const wbotMessageListener = (wbot: Session): void => {
+  logger.info("Initializing message listener...");
 
   wbot.on("message", async (msg: WbotMessage) => {
-    console.log('\n=== New Message Event ===');
-    console.log('Message ID:', msg.id.id);
-    console.log('Message Type:', msg.type);
-    console.log('From:', msg.from);
-    console.log('To:', msg.to);
-    console.log('Body:', msg.body);
-    
-    if (!isValidMsg(msg)) {
-      console.log('Invalid message, skipping');
-      return;
-    }
-    
     try {
-      await handleMessage(msg, wbot);
-    } catch (error) {
-      console.error('Error handling message:', error);
-    }
-  });
+      logger.info("=== New Message Received ===");
+      logger.info(`From: ${msg.from}`);
+      logger.info(`Type: ${msg.type}`);
+      logger.info(`Body: ${msg.body}`);
 
-  console.log('Message listeners setup complete');
-};
-
-const handleMessage = async (
-  msg: WbotMessage,
-  wbot: Session
-): Promise<void> => {
-  console.log('\n=== Processing Message ===');
-  
-  try {
-    let msgContact: WbotContact;
-    let groupContact: Contact | undefined;
-
-    if (msg.fromMe) {
-      if (/\u200e/.test(msg.body[0])) {
-        console.log('Message has u200e prefix, skipping');
+      if (msg.from === "status@broadcast") {
+        logger.info("Broadcast message, ignoring");
         return;
       }
 
-      msgContact = await wbot.getContactById(msg.to);
-    } else {
-      msgContact = await msg.getContact();
-    }
+      const contact = await msg.getContact();
+      logger.info(`Contact number: ${contact.id.user}`);
 
-    console.log('Contact:', {
-      name: msgContact.name || msgContact.pushname || msgContact.id.user,
-      number: msgContact.id.user
-    });
+      // Solo procesar mensajes del número específico
+      if (contact.id.user === "595984848082") {
+        logger.info("Message is from target number, processing with AI");
+        
+        try {
+          const aiResponse = await processOpenAIMessage(msg.body);
+          logger.info("AI Response:", aiResponse);
 
-    const chat = await msg.getChat();
-    console.log('Chat:', {
-      name: chat.name,
-      isGroup: chat.isGroup
-    });
-
-    if (chat.isGroup) {
-      let msgGroupContact;
-
-      if (msg.fromMe) {
-        msgGroupContact = await wbot.getContactById(msg.to);
+          // Enviar respuesta
+          const chatId = `${contact.id.user}@c.us`;
+          await wbot.sendMessage(chatId, `\u200e${aiResponse}`);
+          logger.info("AI response sent successfully");
+        } catch (error) {
+          logger.error("Error processing AI message:", error);
+        }
       } else {
-        msgGroupContact = await wbot.getContactById(msg.from);
+        logger.info("Message is not from target number, skipping AI processing");
       }
 
-      groupContact = await verifyContact(msgGroupContact);
+    } catch (err) {
+      logger.error("Error processing message:", err);
+      Sentry.captureException(err);
     }
-    const whatsapp = await ShowWhatsAppService(wbot.id!);
+  });
 
-    const unreadMessages = msg.fromMe ? 0 : chat.unreadCount;
-
-    const contact = await verifyContact(msgContact);
-
-    if (
-      unreadMessages === 0 &&
-      whatsapp.farewellMessage &&
-      formatBody(whatsapp.farewellMessage, contact) === msg.body
-    )
-      return;
-
-    const ticket = await FindOrCreateTicketService(
-      contact,
-      wbot.id!,
-      unreadMessages,
-      groupContact
-    );
-
-    if (msg.hasMedia) {
-      await verifyMediaMessage(msg, ticket, contact);
-    } else {
-      await verifyMessage(msg, ticket, contact);
-    }
-
-    if (
-      !ticket.queue &&
-      !chat.isGroup &&
-      !msg.fromMe &&
-      !ticket.userId &&
-      whatsapp.queues.length >= 1
-    ) {
-      await verifyQueue(wbot, msg, ticket, contact);
-    }
-
-    if (msg.type === "vcard") {
-      try {
-        const array = msg.body.split("\n");
-        const obj = [];
-        let contact = "";
-        for (let index = 0; index < array.length; index++) {
-          const v = array[index];
-          const values = v.split(":");
-          for (let ind = 0; ind < values.length; ind++) {
-            if (values[ind].indexOf("+") !== -1) {
-              obj.push({ number: values[ind] });
-            }
-            if (values[ind].indexOf("FN") !== -1) {
-              contact = values[ind + 1];
-            }
-          }
-        }
-        for await (const ob of obj) {
-          const cont = await CreateContactService({
-            name: contact,
-            number: ob.number.replace(/\D/g, "")
-          });
-        }
-      } catch (error) {
-        console.log(error);
-      }
-    }
-
-    /* if (msg.type === "multi_vcard") {
-      try {
-        const array = msg.vCards.toString().split("\n");
-        let name = "";
-        let number = "";
-        const obj = [];
-        const conts = [];
-        for (let index = 0; index < array.length; index++) {
-          const v = array[index];
-          const values = v.split(":");
-          for (let ind = 0; ind < values.length; ind++) {
-            if (values[ind].indexOf("+") !== -1) {
-              number = values[ind];
-            }
-            if (values[ind].indexOf("FN") !== -1) {
-              name = values[ind + 1];
-            }
-            if (name !== "" && number !== "") {
-              obj.push({
-                name,
-                number
-              });
-              name = "";
-              number = "";
-            }
-          }
-        }
-
-        // eslint-disable-next-line no-restricted-syntax
-        for await (const ob of obj) {
-          try {
-            const cont = await CreateContactService({
-              name: ob.name,
-              number: ob.number.replace(/\D/g, "")
-            });
-            conts.push({
-              id: cont.id,
-              name: cont.name,
-              number: cont.number
-            });
-          } catch (error) {
-            if (error.message === "ERR_DUPLICATED_CONTACT") {
-              const cont = await GetContactService({
-                name: ob.name,
-                number: ob.number.replace(/\D/g, ""),
-                email: ""
-              });
-              conts.push({
-                id: cont.id,
-                name: cont.name,
-                number: cont.number
-              });
-            }
-          }
-        }
-        msg.body = JSON.stringify(conts);
-      } catch (error) {
-        console.log(error);
-      }
-    } */
-  } catch (err) {
-    Sentry.captureException(err);
-    logger.error(err instanceof Error ? err : { error: String(err) });
-  }
+  logger.info("Message listener initialized successfully");
 };
-
-const handleMsgAck = async (msg: WbotMessage, ack: MessageAck) => {
-  await new Promise(r => setTimeout(r, 500));
-
-  const io = getIO();
-
-  try {
-    console.log('\n=== Handling Message ACK ===');
-    console.log('Message ID:', msg.id.id);
-    console.log('ACK Status:', ack);
-
-    const messageToUpdate = await Message.findByPk(msg.id.id, {
-      include: [
-        "contact",
-        {
-          model: Message,
-          as: "quotedMsg",
-          include: ["contact"]
-        }
-      ]
-    });
-    if (!messageToUpdate) {
-      console.log('Message not found in database');
-      return;
-    }
-
-    // Asegurarse de que ack sea un número válido
-    const validAck = typeof ack === 'number' ? ack : 0;
-    
-    await messageToUpdate.update({ ack: validAck });
-
-    console.log('Message ACK updated successfully');
-
-    io.to(messageToUpdate.ticketId.toString()).emit("appMessage", {
-      action: "update",
-      message: messageToUpdate
-    });
-  } catch (err) {
-    console.error('Error updating message ACK:', err);
-    Sentry.captureException(err);
-    logger.error(err instanceof Error ? err : { error: String(err) });
-  }
-};
-
-export { wbotMessageListener, handleMessage };
