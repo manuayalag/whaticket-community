@@ -71,7 +71,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   try {
     await schema.validate(newContact);
   } catch (err) {
-    throw new AppError(err.message);
+    throw new AppError((err as Error).message);
   }
 
   await CheckIsValidContact(newContact.number);
@@ -126,7 +126,7 @@ export const update = async (
   try {
     await schema.validate(contactData);
   } catch (err) {
-    throw new AppError(err.message);
+    throw new AppError((err as Error).message);
   }
 
   await CheckIsValidContact(contactData.number);

@@ -40,8 +40,9 @@ describe("User", () => {
         password: faker.internet.password()
       });
     } catch (err) {
-      expect(err).toBeInstanceOf(AppError);
-      expect(err.statusCode).toBe(400);
+      const error = err as AppError;
+      expect(error).toBeInstanceOf(AppError);
+      expect(error.statusCode).toBe(400);
     }
   });
 });

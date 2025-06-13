@@ -42,9 +42,10 @@ describe("Auth", () => {
         password: faker.internet.password()
       });
     } catch (err) {
-      expect(err).toBeInstanceOf(AppError);
-      expect(err.statusCode).toBe(401);
-      expect(err.message).toBe("ERR_INVALID_CREDENTIALS");
+      const error = err as AppError;
+      expect(error).toBeInstanceOf(AppError);
+      expect(error.statusCode).toBe(401);
+      expect(error.message).toBe("ERR_INVALID_CREDENTIALS");
     }
   });
 
@@ -61,9 +62,10 @@ describe("Auth", () => {
         password: faker.internet.password()
       });
     } catch (err) {
-      expect(err).toBeInstanceOf(AppError);
-      expect(err.statusCode).toBe(401);
-      expect(err.message).toBe("ERR_INVALID_CREDENTIALS");
+      const error = err as AppError;
+      expect(error).toBeInstanceOf(AppError);
+      expect(error.statusCode).toBe(401);
+      expect(error.message).toBe("ERR_INVALID_CREDENTIALS");
     }
   });
 });

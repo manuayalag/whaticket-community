@@ -50,7 +50,7 @@ const CreateUserService = async ({
   try {
     await schema.validate({ email, password, name });
   } catch (err) {
-    throw new AppError(err.message);
+    throw new AppError((err as Error).message);
   }
 
   const user = await User.create(

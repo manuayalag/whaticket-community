@@ -107,7 +107,7 @@ const verifyMediaMessage = async (
     );
   } catch (err) {
     Sentry.captureException(err);
-    logger.error(err);
+    logger.error(err instanceof Error ? err : String(err));
   }
 
   const messageData = {
@@ -411,7 +411,7 @@ const handleMessage = async (
     } */
   } catch (err) {
     Sentry.captureException(err);
-    logger.error(`Error handling whatsapp message: Err: ${err}`);
+    logger.error(err instanceof Error ? err : String(err));
   }
 };
 
@@ -442,7 +442,7 @@ const handleMsgAck = async (msg: WbotMessage, ack: MessageAck) => {
     });
   } catch (err) {
     Sentry.captureException(err);
-    logger.error(`Error handling message ack. Err: ${err}`);
+    logger.error(err instanceof Error ? err : String(err));
   }
 };
 

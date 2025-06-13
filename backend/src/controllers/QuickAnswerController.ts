@@ -42,7 +42,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   try {
     await QuickAnswerSchema.validate(newQuickAnswer);
   } catch (err) {
-    throw new AppError(err.message);
+    throw new AppError((err as Error).message);
   }
 
   const quickAnswer = await CreateQuickAnswerService({
@@ -80,7 +80,7 @@ export const update = async (
   try {
     await schema.validate(quickAnswerData);
   } catch (err) {
-    throw new AppError(err.message);
+    throw new AppError((err as Error).message);
   }
 
   const { quickAnswerId } = req.params;
