@@ -219,11 +219,11 @@ const verifyMessage = async (
   ticket: Ticket,
   contact: Contact
 ) => {
-  console.log('\n=== Message Received ===');
+  console.log('\n=== Verify Message Start ===');
+  console.log('Contact number:', contact.number);
   console.log('Message type:', msg.type);
-  console.log('From contact:', contact.number);
   console.log('Is fromMe:', msg.fromMe);
-  console.log('Body starts with u200e:', msg.body.startsWith("\u200e"));
+  console.log('Message body:', msg.body);
 
   if (msg.type === 'location')
     msg = prepareLocation(msg);
@@ -235,16 +235,24 @@ const verifyMessage = async (
     msg.type === "chat" && 
     !msg.body.startsWith("\u200e")
   ) {
-    console.log('\n=== Conditions for AI Processing ===');
-    console.log('Not fromMe:', !msg.fromMe);
-    console.log('Contact number matches:', contact.number === "595984848082");
-    console.log('Message type is chat:', msg.type === "chat");
-    console.log('Body does not start with u200e:', !msg.body.startsWith("\u200e"));
-    
     try {
-      console.log('\n=== Processing message for OpenAI ===');
+      console.log('\n=== OpenAI Processing Conditions Met ===');
       console.log('From contact:', contact.number);
       console.log('Message:', msg.body);
+
+      const settings = await Setting.findOne({
+        where: { key: 'openai' }
+      });
+
+      if (!settings) {
+        console.error('OpenAI settings not found in database');
+        return;
+      }
+
+      console.log('Found OpenAI settings:', {
+        hasSettings: !!settings,
+        settingsValue: settings.value
+      });
 
       const aiResponse = await processOpenAIMessage(msg.body);
       console.log('AI Response received:', aiResponse);
@@ -261,6 +269,7 @@ const verifyMessage = async (
         // Construct the chat ID properly
         const chatId = `${contact.number}@${ticket.isGroup ? "g" : "c"}.us`;
         console.log('Attempting to send message to:', chatId);
+        console.log('Message to send:', aiResponse);
 
         // Send the message
         const sentMessage = await wbot.sendMessage(
@@ -272,16 +281,22 @@ const verifyMessage = async (
         console.log('Message sent successfully:', sentMessage.id.id);
       } catch (sendError) {
         console.error('Error sending WhatsApp message:', {
-          error: sendError.message,
-          stack: sendError.stack
+          error: sendError instanceof Error ? sendError.message : String(sendError),
+          stack: sendError instanceof Error ? sendError.stack : undefined
         });
       }
     } catch (error) {
       console.error('Error in AI processing:', {
-        error: error.message,
-        stack: error.stack
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
       });
     }
+  } else {
+    console.log('Message did not meet OpenAI processing conditions:');
+    console.log('- Not fromMe:', !msg.fromMe);
+    console.log('- Contact number matches:', contact.number === "595984848082");
+    console.log('- Message type is chat:', msg.type === "chat");
+    console.log('- Does not start with u200e:', !msg.body.startsWith("\u200e"));
   }
 
   const quotedMsg = await verifyQuotedMessage(msg);
