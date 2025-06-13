@@ -8,7 +8,16 @@ const readline = require('readline');
 
 // Constants
 const CONTAINER_NAME = 'wha-ticket_backend_1';
-const LOG_FILE = './backend/logs/debug.log';
+// Log file paths to check
+const LOG_PATHS = [
+  './backend/logs/debug.log',
+  '/home/ubuntu/whaticket/backend/logs/debug.log',
+  '/root/whaticket/backend/logs/debug.log',
+  '/usr/src/app/logs/debug.log',
+  '/tmp/whaticket-debug.log'
+];
+// Get the first existing log file or default
+const LOG_FILE = LOG_PATHS.find(path => fs.existsSync(path)) || './backend/logs/debug.log';
 
 // Helper functions
 function runCommand(command) {
@@ -126,6 +135,45 @@ function tailLogs() {
   runCommand(`docker logs -f ${CONTAINER_NAME}`);
 }
 
+function fixDockerComposeFile() {
+  console.log('Checking and fixing docker-compose.yaml file...');
+  
+  const composeFile = './docker-compose.yaml';
+  if (!fs.existsSync(composeFile)) {
+    console.error('docker-compose.yaml file not found!');
+    return showMenu();
+  }
+  
+  try {
+    // Read docker-compose file
+    let content = fs.readFileSync(composeFile, 'utf-8');
+    
+    // Check for common issues and fix them
+    
+    // Fix 1: Ports and volumes on same line
+    content = content.replace(
+      /ports:[\s\n]+\s+- (.*?):(\d+)\s+volumes:/g, 
+      'ports:\n      - $1:$2\n    volumes:'
+    );
+    
+    // Ensure proper indentation
+    content = content.replace(/\r\n/g, '\n'); // normalize line endings
+    
+    // Write fixed content back to file
+    fs.writeFileSync(composeFile, content);
+    console.log('Fixed docker-compose.yaml file');
+    
+    // Backup the file just in case
+    fs.writeFileSync(`${composeFile}.backup`, content);
+    console.log('Created backup at docker-compose.yaml.backup');
+    
+  } catch (error) {
+    console.error('Error fixing docker-compose file:', error);
+  }
+  
+  showMenu();
+}
+
 function showMenu() {
   console.log('\n==== WhatsApp Ticket System Debug Menu ====');
   console.log('1. Check log file status');
@@ -134,7 +182,8 @@ function showMenu() {
   console.log('4. Restart backend container');
   console.log('5. Create log directories and set permissions');
   console.log('6. Watch container logs in real-time');
-  console.log('7. Exit');
+  console.log('7. Fix docker-compose.yaml file');
+  console.log('8. Exit');
   
   const rl = readline.createInterface({
     input: process.stdin,
@@ -166,6 +215,9 @@ function showMenu() {
         tailLogs();
         break;
       case '7':
+        fixDockerComposeFile();
+        break;
+      case '8':
         console.log('Exiting...');
         process.exit(0);
       default:
