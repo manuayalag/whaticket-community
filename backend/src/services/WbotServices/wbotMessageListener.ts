@@ -141,17 +141,34 @@ const processOpenAIMessage = async (msg: string): Promise<string> => {
     });
 
     if (!settings) {
+      logger.error('OpenAI settings not found in database');
       return "OpenAI configuration not found";
     }
 
-    const { key, model, systemMessage } = JSON.parse(settings.value);
+    let parsedSettings;
+    try {
+      parsedSettings = JSON.parse(settings.value);
+      logger.info('OpenAI Settings:', {
+        model: parsedSettings.model,
+        hasKey: !!parsedSettings.key,
+        hasSystemMessage: !!parsedSettings.systemMessage
+      });
+    } catch (parseError) {
+      logger.error('Error parsing OpenAI settings:', parseError);
+      return "Error in OpenAI configuration";
+    }
+
+    const { key, model, systemMessage } = parsedSettings;
 
     if (!key) {
+      logger.error('OpenAI API key not found in settings');
       return "OpenAI API key not configured";
     }
 
     const openai = new OpenAI({ apiKey: key });
 
+    logger.info('Sending request to OpenAI with model:', model || 'gpt-3.5-turbo');
+    
     const completion = await openai.chat.completions.create({
       messages: [
         { role: 'system', content: systemMessage || 'Eres un asistente amable y profesional.' },
@@ -160,12 +177,30 @@ const processOpenAIMessage = async (msg: string): Promise<string> => {
       model: model || 'gpt-3.5-turbo',
       temperature: 0.7,
       max_tokens: 500
+    }).catch(error => {
+      logger.error('OpenAI API Error:', {
+        error: error.message,
+        type: error.type,
+        status: error.status
+      });
+      throw error;
     });
 
+    if (!completion || !completion.choices || !completion.choices[0]) {
+      logger.error('Invalid response from OpenAI:', completion);
+      return "Error: Invalid response from AI";
+    }
+
+    logger.info('Successfully received OpenAI response');
     return completion.choices[0].message.content || "No response generated";
   } catch (error) {
-    console.error("OpenAI Error:", error);
-    return "Error processing message with AI";
+    logger.error('Error in processOpenAIMessage:', {
+      error: error instanceof Error ? {
+        message: error.message,
+        stack: error.stack
+      } : error
+    });
+    return `Error processing message with AI: ${error instanceof Error ? error.message : 'Unknown error'}`;
   }
 };
 
