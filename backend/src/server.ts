@@ -3,33 +3,30 @@ import app from "./app";
 import { initIO } from "./libs/socket";
 import { logger } from "./utils/logger";
 import { logToFile } from "./utils/fileLogger";
+import { verifyOpenAIConfig } from "./utils/openaiChecker";
 import { StartAllWhatsAppsSessions } from "./services/WbotServices/StartAllWhatsAppsSessions";
 
 logToFile("==================================");
 logToFile("INICIANDO SERVIDOR");
 logToFile("==================================");
 
-// Check every 30 seconds if OpenAI is working
-setInterval(async () => {
-  const { Setting } = require("./models");
+// Verificar OpenAI al inicio
+setTimeout(async () => {
   try {
-    logToFile("==================================");
-    logToFile(`VERIFICACIÓN PERIÓDICA DE OPENAI: ${new Date().toISOString()}`);
-
-    const settings = await Setting.findOne({
-      where: { key: "openai" },
-    });
-
-    if (settings) {
-      logToFile(`Configuración de OpenAI encontrada: ${settings.value}`);
-    } else {
-      logToFile("¡NO SE ENCONTRÓ CONFIGURACIÓN DE OPENAI!");
-    }
-    logToFile("==================================");
+    await verifyOpenAIConfig();
   } catch (error) {
-    logToFile(`Error al verificar configuración: ${error}`);
+    logToFile(`Error verificando OpenAI: ${error}`);
   }
-}, 30000);
+}, 5000);
+
+// Check every 60 seconds if OpenAI is working
+setInterval(async () => {
+  try {
+    await verifyOpenAIConfig();
+  } catch (error) {
+    logToFile(`Error verificando OpenAI: ${error}`);
+  }
+}, 60000);
 
 const server = app.listen(process.env.PORT, () => {
   logger.info(`Server started on port: ${process.env.PORT}`);
