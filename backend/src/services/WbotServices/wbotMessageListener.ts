@@ -219,6 +219,12 @@ const verifyMessage = async (
   ticket: Ticket,
   contact: Contact
 ) => {
+  console.log('\n=== Message Received ===');
+  console.log('Message type:', msg.type);
+  console.log('From contact:', contact.number);
+  console.log('Is fromMe:', msg.fromMe);
+  console.log('Body starts with u200e:', msg.body.startsWith("\u200e"));
+
   if (msg.type === 'location')
     msg = prepareLocation(msg);
 
@@ -229,6 +235,12 @@ const verifyMessage = async (
     msg.type === "chat" && 
     !msg.body.startsWith("\u200e")
   ) {
+    console.log('\n=== Conditions for AI Processing ===');
+    console.log('Not fromMe:', !msg.fromMe);
+    console.log('Contact number matches:', contact.number === "595984848082");
+    console.log('Message type is chat:', msg.type === "chat");
+    console.log('Body does not start with u200e:', !msg.body.startsWith("\u200e"));
+    
     try {
       console.log('\n=== Processing message for OpenAI ===');
       console.log('From contact:', contact.number);
@@ -385,20 +397,20 @@ const handleMessage = async (
   }
 
   try {
+    console.log('\n=== New Message Handling Started ===');
     let msgContact: WbotContact;
     let groupContact: Contact | undefined;
 
     if (msg.fromMe) {
-      // messages sent automatically by wbot have a special character in front of it
-      // if so, this message was already been stored in database;
-      if (/\u200e/.test(msg.body[0])) return;
+      if (/\u200e/.test(msg.body[0])) {
+        console.log('Message has u200e prefix, skipping');
+        return;
+      }
 
-      // media messages sent from me from cell phone, first comes with "hasMedia = false" and type = "image/ptt/etc"
-      // in this case, return and let this message be handled by "media_uploaded" event, when it will have "hasMedia = true"
-
-      if (!msg.hasMedia && msg.type !== "location" && msg.type !== "chat" && msg.type !== "vcard"
-        //&& msg.type !== "multi_vcard"
-      ) return;
+      if (!msg.hasMedia && msg.type !== "location" && msg.type !== "chat" && msg.type !== "vcard") {
+        console.log('Message is not media/location/chat/vcard, skipping');
+        return;
+      }
 
       msgContact = await wbot.getContactById(msg.to);
     } else {
