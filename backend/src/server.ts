@@ -8,6 +8,11 @@ import { StartAllWhatsAppsSessions } from "./services/WbotServices/StartAllWhats
 
 logToFile("==================================");
 logToFile("INICIANDO SERVIDOR");
+logToFile(`FECHA Y HORA: ${new Date().toISOString()}`);
+logToFile(`DIRECTORIO DE TRABAJO: ${process.cwd()}`);
+logToFile(`RUTA DE LOGS: ${process.env.LOG_FILE_PATH || "/usr/src/app/logs/debug.log"}`);
+logToFile(`NÚMEROS OBJETIVO: 595984848082 (WhatsApp)`);
+logToFile("VERSIÓN DE NODE: " + process.version);
 logToFile("==================================");
 
 // Verificar OpenAI al inicio

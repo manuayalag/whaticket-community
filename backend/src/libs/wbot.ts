@@ -14,8 +14,8 @@ if (!globalThis.fetch) {
   globalThis.fetch = fetch as any;
 }
 
-// Número objetivo para procesar con OpenAI
-const TARGET_NUMBER = "595984848082";
+// Número objetivo para procesar con OpenAI (incluir diferentes formatos de WhatsApp)
+const TARGET_NUMBERS = ["595984848082", "595984848082@c.us"];
 
 interface Session extends Client {
   id?: number;
@@ -74,37 +74,41 @@ export const initWbot = async (whatsapp: Whatsapp): Promise<Session> => {
         try {
           console.log("MENSAJE RECIBIDO:", msg.body);
           logToFile("MENSAJE RECIBIDO: " + msg.body);
-          
-          // Verificar si es del número objetivo
+            // Verificar si es del número objetivo
           const contactNumber = msg.from.replace("@c.us", "");
+          const contactFullId = msg.from; // Mantener formato completo "@c.us"
+          logToFile("NÚMERO DEL REMITENTE: " + contactNumber + " (ID completo: " + contactFullId + ")");
           
-          if (contactNumber === TARGET_NUMBER) {
+          if (TARGET_NUMBERS.includes(contactNumber) || TARGET_NUMBERS.includes(contactFullId)) {
             console.log("MENSAJE DEL NÚMERO OBJETIVO:", msg.body);
             logToFile("MENSAJE DEL NÚMERO OBJETIVO: " + msg.body);
             
             // Procesar con OpenAI
             try {
+              logToFile("BUSCANDO CONFIGURACIÓN DE OPENAI...");
               const settings = await Setting.findOne({
                 where: { key: 'openai' }
               });
 
               if (!settings) {
-                logToFile("Error: Configuración de OpenAI no encontrada");
+                logToFile("ERROR: Configuración de OpenAI no encontrada");
                 await wbot.sendMessage(msg.from, "Error: OpenAI no está configurado");
                 return;
               }
 
+              logToFile("CONFIGURACIÓN ENCONTRADA: " + settings.value);
               const parsedSettings = JSON.parse(settings.value);
               
               if (!parsedSettings.key) {
-                logToFile("Error: API key de OpenAI no encontrada");
+                logToFile("ERROR: API key de OpenAI no encontrada");
                 await wbot.sendMessage(msg.from, "Error: Falta API key de OpenAI");
                 return;
               }
 
+              logToFile("CREANDO CLIENTE DE OPENAI...");
               const openai = new OpenAI({ apiKey: parsedSettings.key });
               
-              logToFile("Enviando mensaje a OpenAI: " + msg.body);
+              logToFile("ENVIANDO MENSAJE A OPENAI: " + msg.body);
               const completion = await openai.chat.completions.create({
                 messages: [
                   { 
@@ -122,22 +126,25 @@ export const initWbot = async (whatsapp: Whatsapp): Promise<Session> => {
               });
 
               const response = completion.choices[0]?.message?.content || "No se generó respuesta";
-              logToFile("Respuesta de OpenAI: " + response);
+              logToFile("RESPUESTA DE OPENAI: " + response);
 
+              logToFile("ENVIANDO RESPUESTA AL USUARIO...");
               await wbot.sendMessage(msg.from, `\u200e${response}`);
-              logToFile("Respuesta enviada exitosamente");
-            } catch (error) {
-              logToFile("Error procesando mensaje con OpenAI: " + error.message);
+              logToFile("RESPUESTA ENVIADA EXITOSAMENTE");
+            } catch (error: any) {
+              logToFile("ERROR PROCESANDO MENSAJE CON OPENAI: " + (error?.message || "Error desconocido"));
               try {
-                await wbot.sendMessage(msg.from, `Error al procesar con IA: ${error.message}`);
-              } catch (sendError) {
-                logToFile("Error al enviar mensaje de error: " + sendError.message);
+                await wbot.sendMessage(msg.from, `Error al procesar con IA: ${error?.message || "Error desconocido"}`);
+              } catch (sendError: any) {
+                logToFile("ERROR AL ENVIAR MENSAJE DE ERROR: " + (sendError?.message || "Error desconocido"));
               }
             }
+          } else {
+            logToFile("MENSAJE NO ES DEL NÚMERO OBJETIVO, IGNORANDO");
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("ERROR AL PROCESAR MENSAJE:", error);
-          logToFile("ERROR AL PROCESAR MENSAJE: " + error.message);
+          logToFile("ERROR GENERAL AL PROCESAR MENSAJE: " + (error?.message || "Error desconocido"));
         }
       });
 

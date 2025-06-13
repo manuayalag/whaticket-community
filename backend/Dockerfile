@@ -25,6 +25,9 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm install
 
+# Create logs directory with correct permissions
+RUN mkdir -p /usr/src/app/logs && chmod -R 777 /usr/src/app/logs
+
 COPY . .
 RUN npm run build
 

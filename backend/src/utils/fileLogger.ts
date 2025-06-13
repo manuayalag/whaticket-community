@@ -1,15 +1,21 @@
-import fs from 'fs';
-import path from 'path';
+import fs from "fs";
+import path from "path";
 
-// En Docker, necesitamos escribir en un directorio accesible
-const LOG_FILE = '/usr/src/app/debug.log';
+// Define path based on environment variable or use a default that should work
+const LOG_FILE = process.env.LOG_FILE_PATH || "/usr/src/app/logs/debug.log";
 
-// Ensure the log file exists
+// Attempt to create any parent directories that don't exist
 try {
-  fs.writeFileSync(LOG_FILE, '=== LOG INITIALIZED ===\n', { flag: 'a' });
-  console.log('Log file initialized at:', LOG_FILE);
+  const dir = path.dirname(LOG_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  
+  // Initialize the log file
+  fs.writeFileSync(LOG_FILE, "=== LOG INITIALIZED ===\n", { flag: "a" });
+  console.log("Log file initialized at:", LOG_FILE);
 } catch (error) {
-  console.error('Failed to initialize log file', error);
+  console.error("Failed to initialize log file:", error);
 }
 
 export const logToFile = (message: string): void => {
