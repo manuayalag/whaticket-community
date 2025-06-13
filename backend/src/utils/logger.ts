@@ -1,8 +1,14 @@
 import pino from "pino";
 
 const logger = pino({
-  prettyPrint: {
-    ignore: "pid,hostname"
+  level: 'debug',
+  transport: {
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      ignore: 'pid,hostname',
+      translateTime: 'SYS:standard',
+    }
   }
 });
 
