@@ -566,6 +566,10 @@ const handleMsgAck = async (msg: WbotMessage, ack: MessageAck) => {
   const io = getIO();
 
   try {
+    console.log('\n=== Handling Message ACK ===');
+    console.log('Message ID:', msg.id.id);
+    console.log('ACK Status:', ack);
+
     const messageToUpdate = await Message.findByPk(msg.id.id, {
       include: [
         "contact",
@@ -577,32 +581,61 @@ const handleMsgAck = async (msg: WbotMessage, ack: MessageAck) => {
       ]
     });
     if (!messageToUpdate) {
+      console.log('Message not found in database');
       return;
     }
-    await messageToUpdate.update({ ack });
+
+    // Asegurarse de que ack sea un número válido
+    const validAck = typeof ack === 'number' ? ack : 0;
+    
+    await messageToUpdate.update({ ack: validAck });
+
+    console.log('Message ACK updated successfully');
 
     io.to(messageToUpdate.ticketId.toString()).emit("appMessage", {
       action: "update",
       message: messageToUpdate
     });
   } catch (err) {
+    console.error('Error updating message ACK:', err);
     Sentry.captureException(err);
     logger.error(err instanceof Error ? err : { error: String(err) });
   }
 };
 
 const wbotMessageListener = (wbot: Session): void => {
-  wbot.on("message_create", async msg => {
+  console.log('=== Setting up WhatsApp message listeners ===');
+
+  wbot.on("message_create", async (msg: WbotMessage) => {
+    console.log('\n=== Message Create Event Triggered ===');
+    console.log('Message type:', msg.type);
+    console.log('Message body:', msg.body);
     handleMessage(msg, wbot);
   });
 
-  wbot.on("media_uploaded", async msg => {
+  wbot.on("message", async (msg: WbotMessage) => {
+    console.log('\n=== Message Event Triggered ===');
+    console.log('Message type:', msg.type);
+    console.log('Message body:', msg.body);
     handleMessage(msg, wbot);
   });
 
-  wbot.on("message_ack", async (msg, ack) => {
-    handleMsgAck(msg, ack);
+  wbot.on("media_uploaded", async (msg: WbotMessage) => {
+    console.log('\n=== Media Uploaded Event Triggered ===');
+    handleMessage(msg, wbot);
   });
+
+  wbot.on("message_ack", async (msg: WbotMessage, ack: MessageAck) => {
+    console.log('\n=== Message ACK Event Triggered ===');
+    console.log('ACK Status:', ack);
+    try {
+      await handleMsgAck(msg, ack || 0); // Asegurarse de que ack nunca sea null
+    } catch (err) {
+      console.error('Error handling message ack:', err);
+    }
+  });
+
+  console.log('=== WhatsApp message listeners setup complete ===');
 };
 
 export { wbotMessageListener, handleMessage };
