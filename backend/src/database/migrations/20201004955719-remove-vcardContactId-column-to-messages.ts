@@ -1,8 +1,10 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
 module.exports = {
-  up: (queryInterface: QueryInterface) => {
-    return queryInterface.removeColumn("Messages", "vcardContactId");
+  up: async (queryInterface: QueryInterface) => {
+    // Migración deshabilitada temporalmente por bug de Sequelize en entornos limpios
+    // Si necesitas eliminar la columna vcardContactId, hazlo manualmente en la base de datos.
+    return Promise.resolve();
   },
 
   down: (queryInterface: QueryInterface) => {
