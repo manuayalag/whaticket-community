@@ -2,9 +2,23 @@ import { join } from "path";
 import { promisify } from "util";
 import { writeFile } from "fs";
 import * as Sentry from "@sentry/node";
-import { OpenAI } from 'openai';
+import fetch from "node-fetch";
+import { OpenAI } from "openai";
 import GetTicketWbot from "../../helpers/GetTicketWbot";
-
+import Contact from "../../models/Contact";
+import Ticket from "../../models/Ticket";
+import Message from "../../models/Message";
+import Setting from "../../models/Setting";
+import { getIO } from "../../libs/socket";
+import CreateMessageService from "../MessageServices/CreateMessageService";
+import { debounce } from "../../helpers/Debounce";
+import { logger } from "../../utils/logger";
+import CreateContactService from "../ContactServices/CreateContactService";
+import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
+import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
+import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
+import UpdateTicketService from "../TicketServices/UpdateTicketService";
+import formatBody from "../../helpers/Mustache";
 import {
   Contact as WbotContact,
   Message as WbotMessage,
@@ -12,28 +26,11 @@ import {
   Client
 } from "whatsapp-web.js";
 
-import Contact from "../../models/Contact";
-import Ticket from "../../models/Ticket";
-import Message from "../../models/Message";
-import Setting from "../../models/Setting";
+type Session = Client;
 
-import { getIO } from "../../libs/socket";
-import CreateMessageService from "../MessageServices/CreateMessageService";
-import { logger } from "../../utils/logger";
-import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
-import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
-import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
-import { debounce } from "../../helpers/Debounce";
-import UpdateTicketService from "../TicketServices/UpdateTicketService";
-import CreateContactService from "../ContactServices/CreateContactService";
-import GetContactService from "../ContactServices/GetContactService";
-import formatBody from "../../helpers/Mustache";
-
-interface Session extends Client {
-  id?: number;
-  sendMessage(to: string, content: string | any): Promise<any>;
-  getContactById(contactId: string): Promise<WbotContact>;
-  on(event: string, listener: (...args: any[]) => void): this;
+// Configurar fetch globalmente para OpenAI
+if (!globalThis.fetch) {
+  globalThis.fetch = fetch;
 }
 
 const writeFileAsync = promisify(writeFile);
@@ -200,20 +197,20 @@ const processOpenAIMessage = async (msg: string): Promise<string> => {
       console.log('Final response:', response);
       return response;
 
-    } catch (apiError: any) {
+    } catch (error) {
       console.error('OpenAI API Error:', {
-        message: apiError.message,
-        type: apiError.type,
-        stack: apiError.stack
+        message: error instanceof Error ? error.message : String(error),
+        type: error instanceof Error ? error.constructor.name : typeof error,
+        stack: error instanceof Error ? error.stack : undefined
       });
-      return `Error calling OpenAI API: ${apiError.message}`;
+      return `Error calling OpenAI API: ${error instanceof Error ? error.message : String(error)}`;
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Unexpected error:', {
-      message: error.message,
-      stack: error.stack
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
-    return `Error processing message with AI: ${error.message}`;
+    return `Error processing message with AI: ${error instanceof Error ? error.message : String(error)}`;
   }
 };
 
