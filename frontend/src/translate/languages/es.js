@@ -288,10 +288,10 @@ const messages = {
           tickets: "Tickets",
           contacts: "Contactos",
           quickAnswers: "Respuestas rápidas",
-          queues: "Linhas",
-          administration: "Administración",
+          queues: "Linhas",          administration: "Administración",
           users: "Usuarios",
           settings: "Configuración",
+          openai: "OpenAI",
         },
         appBar: {
           user: {

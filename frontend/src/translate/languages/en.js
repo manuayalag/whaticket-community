@@ -284,10 +284,10 @@ const messages = {
           tickets: "Tickets",
           contacts: "Contacts",
           quickAnswers: "Quick Answers",
-          queues: "Queues",
-          administration: "Administration",
+          queues: "Queues",          administration: "Administration",
           users: "Users",
           settings: "Settings",
+          openai: "OpenAI",
         },
         appBar: {
           user: {
