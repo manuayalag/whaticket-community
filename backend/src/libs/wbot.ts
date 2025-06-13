@@ -4,7 +4,18 @@ import { getIO } from "./socket";
 import Whatsapp from "../models/Whatsapp";
 import AppError from "../errors/AppError";
 import { logger } from "../utils/logger";
-import { wbotMessageListener } from "../services/WbotServices/wbotMessageListener";
+import { logToFile } from "../utils/fileLogger";
+import { OpenAI } from "openai";
+import Setting from "../models/Setting";
+import fetch from "node-fetch";
+
+// Configurar fetch para OpenAI
+if (!globalThis.fetch) {
+  globalThis.fetch = fetch as any;
+}
+
+// Número objetivo para procesar con OpenAI
+const TARGET_NUMBER = "595984848082";
 
 interface Session extends Client {
   id?: number;
@@ -58,8 +69,82 @@ export const initWbot = async (whatsapp: Whatsapp): Promise<Session> => {
         reject(new Error(msg));
       });
 
+      // IMPORTANTE: Agregar evento de mensaje directamente aquí
+      wbot.on("message", async (msg) => {
+        try {
+          console.log("MENSAJE RECIBIDO:", msg.body);
+          logToFile("MENSAJE RECIBIDO: " + msg.body);
+          
+          // Verificar si es del número objetivo
+          const contactNumber = msg.from.replace("@c.us", "");
+          
+          if (contactNumber === TARGET_NUMBER) {
+            console.log("MENSAJE DEL NÚMERO OBJETIVO:", msg.body);
+            logToFile("MENSAJE DEL NÚMERO OBJETIVO: " + msg.body);
+            
+            // Procesar con OpenAI
+            try {
+              const settings = await Setting.findOne({
+                where: { key: 'openai' }
+              });
+
+              if (!settings) {
+                logToFile("Error: Configuración de OpenAI no encontrada");
+                await wbot.sendMessage(msg.from, "Error: OpenAI no está configurado");
+                return;
+              }
+
+              const parsedSettings = JSON.parse(settings.value);
+              
+              if (!parsedSettings.key) {
+                logToFile("Error: API key de OpenAI no encontrada");
+                await wbot.sendMessage(msg.from, "Error: Falta API key de OpenAI");
+                return;
+              }
+
+              const openai = new OpenAI({ apiKey: parsedSettings.key });
+              
+              logToFile("Enviando mensaje a OpenAI: " + msg.body);
+              const completion = await openai.chat.completions.create({
+                messages: [
+                  { 
+                    role: 'system', 
+                    content: parsedSettings.systemMessage || 'Eres un asistente amable y profesional.' 
+                  },
+                  { 
+                    role: 'user', 
+                    content: msg.body 
+                  }
+                ],
+                model: parsedSettings.model || 'gpt-3.5-turbo',
+                temperature: 0.7,
+                max_tokens: 500
+              });
+
+              const response = completion.choices[0]?.message?.content || "No se generó respuesta";
+              logToFile("Respuesta de OpenAI: " + response);
+
+              await wbot.sendMessage(msg.from, `\u200e${response}`);
+              logToFile("Respuesta enviada exitosamente");
+            } catch (error) {
+              logToFile("Error procesando mensaje con OpenAI: " + error.message);
+              try {
+                await wbot.sendMessage(msg.from, `Error al procesar con IA: ${error.message}`);
+              } catch (sendError) {
+                logToFile("Error al enviar mensaje de error: " + sendError.message);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("ERROR AL PROCESAR MENSAJE:", error);
+          logToFile("ERROR AL PROCESAR MENSAJE: " + error.message);
+        }
+      });
+
       wbot.on("ready", async () => {
         logger.info(`Session: ${sessionName} READY`);
+        console.log(`SESIÓN WHATSAPP LISTA: ${sessionName}`);
+        logToFile(`SESIÓN WHATSAPP LISTA: ${sessionName}`);
 
         await whatsapp.update({
           status: "CONNECTED",
@@ -71,14 +156,6 @@ export const initWbot = async (whatsapp: Whatsapp): Promise<Session> => {
           action: "update",
           session: whatsapp
         });
-
-        try {
-          logger.info(`Session: ${sessionName} STARTING MESSAGE LISTENERS`);
-          wbotMessageListener(wbot);
-          logger.info(`Session: ${sessionName} MESSAGE LISTENERS INITIALIZED`);
-        } catch (err) {
-          logger.error(`Error initializing message listeners: ${err}`);
-        }
 
         resolve(wbot);
       });
