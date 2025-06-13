@@ -2,12 +2,8 @@ import { QueryInterface, DataTypes } from "sequelize";
 
 module.exports = {
   up: async (queryInterface: QueryInterface) => {
-    // Verifica si la columna existe antes de intentar eliminarla
-    const table = await queryInterface.describeTable("Messages");
-    if (Object.prototype.hasOwnProperty.call(table, "userId")) {
-      return queryInterface.removeColumn("Messages", "userId");
-    }
-    // Si no existe, no hace nada
+    // Migración deshabilitada temporalmente por bug de Sequelize en entornos limpios
+    // Si necesitas eliminar la columna userId, hazlo manualmente en la base de datos.
     return Promise.resolve();
   },
 
