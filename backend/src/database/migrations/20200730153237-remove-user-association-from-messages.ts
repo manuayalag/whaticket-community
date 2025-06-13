@@ -1,8 +1,14 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
 module.exports = {
-  up: (queryInterface: QueryInterface) => {
-    return queryInterface.removeColumn("Messages", "userId");
+  up: async (queryInterface: QueryInterface) => {
+    // Verifica si la columna existe antes de intentar eliminarla
+    const table = await queryInterface.describeTable("Messages");
+    if (Object.prototype.hasOwnProperty.call(table, "userId")) {
+      return queryInterface.removeColumn("Messages", "userId");
+    }
+    // Si no existe, no hace nada
+    return Promise.resolve();
   },
 
   down: (queryInterface: QueryInterface) => {
