@@ -21,6 +21,6 @@ export const StartWhatsAppSession = async (
     wbotMessageListener(wbot);
     wbotMonitor(wbot, whatsapp);
   } catch (err) {
-    logger.error(err instanceof Error ? err : String(err));
+    logger.error(err instanceof Error ? err : { error: String(err) });
   }
 };
