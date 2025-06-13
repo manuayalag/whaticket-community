@@ -8,7 +8,7 @@ services:
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
     environment:
-      - PMA_HOSTS=whaticketdb
+      - PMA_HOSTS=whaticket
     ports:
       - ${PMA_PORT:-9000}:80
     networks:
