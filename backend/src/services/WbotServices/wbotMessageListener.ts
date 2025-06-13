@@ -2,6 +2,8 @@ import { join } from "path";
 import { promisify } from "util";
 import { writeFile } from "fs";
 import * as Sentry from "@sentry/node";
+import { OpenAI } from 'openai';
+import GetTicketWbot from "../../helpers/GetTicketWbot";
 
 import {
   Contact as WbotContact,
@@ -13,6 +15,7 @@ import {
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
 import Message from "../../models/Message";
+import Setting from "../../models/Setting";
 
 import { getIO } from "../../libs/socket";
 import CreateMessageService from "../MessageServices/CreateMessageService";
@@ -28,6 +31,9 @@ import formatBody from "../../helpers/Mustache";
 
 interface Session extends Client {
   id?: number;
+  sendMessage(to: string, content: string | any): Promise<any>;
+  getContactById(contactId: string): Promise<WbotContact>;
+  on(event: string, listener: (...args: any[]) => void): this;
 }
 
 const writeFileAsync = promisify(writeFile);
@@ -128,14 +134,72 @@ const verifyMediaMessage = async (
   return newMessage;
 };
 
+const processOpenAIMessage = async (msg: string): Promise<string> => {
+  try {
+    const settings = await Setting.findOne({
+      where: { key: 'openai' }
+    });
+
+    if (!settings) {
+      return "OpenAI configuration not found";
+    }
+
+    const { key, model, systemMessage } = JSON.parse(settings.value);
+
+    if (!key) {
+      return "OpenAI API key not configured";
+    }
+
+    const openai = new OpenAI({ apiKey: key });
+
+    const completion = await openai.chat.completions.create({
+      messages: [
+        { role: 'system', content: systemMessage || 'Eres un asistente amable y profesional.' },
+        { role: 'user', content: msg }
+      ],
+      model: model || 'gpt-3.5-turbo',
+      temperature: 0.7,
+      max_tokens: 500
+    });
+
+    return completion.choices[0].message.content || "No response generated";
+  } catch (error) {
+    console.error("OpenAI Error:", error);
+    return "Error processing message with AI";
+  }
+};
+
 const verifyMessage = async (
   msg: WbotMessage,
   ticket: Ticket,
   contact: Contact
 ) => {
-
   if (msg.type === 'location')
     msg = prepareLocation(msg);
+
+  // Process with OpenAI only for specific number and chat messages
+  if (
+    !msg.fromMe && 
+    contact.number === "595984848082" && 
+    msg.type === "chat" && 
+    !msg.body.startsWith("\u200e")
+  ) {
+    try {
+      const aiResponse = await processOpenAIMessage(msg.body);
+      const wbot = await GetTicketWbot(ticket);
+      
+      if (wbot) {
+        await wbot.sendMessage(
+          `${contact.number}@${ticket.isGroup ? "g" : "c"}.us`,
+          `\u200e${aiResponse}`
+        ).catch((err: Error) => {
+          console.error("Error sending AI response:", err);
+        });
+      }
+    } catch (error) {
+      console.error("Error processing AI response:", error);
+    }
+  }
 
   const quotedMsg = await verifyQuotedMessage(msg);
   const messageData = {
@@ -149,8 +213,6 @@ const verifyMessage = async (
     quotedMsgId: quotedMsg?.id
   };
 
-  // temporaryly disable ts checks because of type definition bug for Location object
-  // @ts-ignore
   await ticket.update({ lastMessage: msg.type === "location" ? msg.location.description ? "Localization - " + msg.location.description.split('\\n')[0] : "Localization" : msg.body });
 
   await CreateMessageService({ messageData });
