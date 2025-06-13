@@ -125,55 +125,79 @@ const verifyMediaMessage = async (
 };
 
 const processOpenAIMessage = async (msg: string): Promise<string> => {
-  logger.info("=== Processing OpenAI Message ===");
-  logger.info(`Message: ${msg}`);
+  console.log('\n********************');
+  console.log('INICIANDO PROCESAMIENTO DE IA');
+  console.log('Mensaje recibido:', msg);
   
   try {
+    console.log('Buscando configuración de OpenAI...');
     const settings = await Setting.findOne({
       where: { key: 'openai' }
     });
 
     if (!settings) {
-      logger.error("OpenAI settings not found");
-      return "OpenAI configuration not found";
+      console.error('ERROR: No se encontró configuración de OpenAI en la base de datos');
+      return "OpenAI no está configurado";
     }
 
-    logger.info("Found OpenAI settings");
-    
-    const parsedSettings = JSON.parse(settings.value);
+    console.log('Configuración encontrada, parseando...');
+    let parsedSettings;
+    try {
+      parsedSettings = JSON.parse(settings.value);
+      console.log('Configuración parseada:', {
+        tieneKey: !!parsedSettings.key,
+        modelo: parsedSettings.model,
+        longitudKey: parsedSettings.key?.length
+      });
+    } catch (parseError) {
+      console.error('ERROR al parsear configuración:', parseError);
+      return "Error en configuración de OpenAI";
+    }
+
     const { key, model, systemMessage } = parsedSettings;
 
     if (!key) {
-      logger.error("OpenAI API key not found");
-      return "OpenAI API key not configured";
+      console.error('ERROR: No se encontró API key de OpenAI');
+      return "Falta API key de OpenAI";
     }
 
-    logger.info("Initializing OpenAI client");
+    console.log('Inicializando cliente de OpenAI...');
     const openai = new OpenAI({ apiKey: key });
 
     try {
-      logger.info("Sending request to OpenAI");
+      console.log('Enviando solicitud a OpenAI...');
       const completion = await openai.chat.completions.create({
         messages: [
-          { role: 'system', content: systemMessage || 'Eres un asistente amable y profesional.' },
-          { role: 'user', content: msg }
+          { 
+            role: 'system', 
+            content: systemMessage || 'Eres un asistente amable y profesional.' 
+          },
+          { 
+            role: 'user', 
+            content: msg 
+          }
         ],
         model: model || 'gpt-3.5-turbo',
         temperature: 0.7,
         max_tokens: 500
       });
 
-      const response = completion.choices[0]?.message?.content || "No response generated";
-      logger.info(`OpenAI Response: ${response}`);
+      console.log('Respuesta recibida de OpenAI');
+      const response = completion.choices[0]?.message?.content || "No se generó respuesta";
+      console.log('Respuesta de IA:', response);
       return response;
 
     } catch (error) {
-      logger.error("OpenAI API Error:", error);
-      return `Error calling OpenAI API: ${error instanceof Error ? error.message : String(error)}`;
+      console.error('ERROR al llamar a OpenAI API:', error);
+      console.error('Detalles del error:', {
+        mensaje: error instanceof Error ? error.message : String(error),
+        tipo: error instanceof Error ? error.constructor.name : typeof error
+      });
+      return `Error al llamar a OpenAI: ${error instanceof Error ? error.message : String(error)}`;
     }
   } catch (error) {
-    logger.error("Error processing message:", error);
-    return `Error processing message with AI: ${error instanceof Error ? error.message : String(error)}`;
+    console.error('ERROR inesperado:', error);
+    return `Error al procesar mensaje: ${error instanceof Error ? error.message : String(error)}`;
   }
 };
 
@@ -367,47 +391,43 @@ const isValidMsg = (msg: WbotMessage): boolean => {
 };
 
 export const wbotMessageListener = (wbot: Session): void => {
-  logger.info("Initializing message listener...");
+  console.log('\n=== Iniciando listener de mensajes ===');
 
   wbot.on("message", async (msg: WbotMessage) => {
     try {
-      logger.info("=== New Message Received ===");
-      logger.info(`From: ${msg.from}`);
-      logger.info(`Type: ${msg.type}`);
-      logger.info(`Body: ${msg.body}`);
-
-      if (msg.from === "status@broadcast") {
-        logger.info("Broadcast message, ignoring");
-        return;
-      }
+      console.log('\n=== Mensaje Nuevo Recibido ===');
+      console.log('De:', msg.from);
+      console.log('Tipo:', msg.type);
+      console.log('Contenido:', msg.body);
 
       const contact = await msg.getContact();
-      logger.info(`Contact number: ${contact.id.user}`);
+      console.log('Número de contacto:', contact.id.user);
 
-      // Solo procesar mensajes del número específico
       if (contact.id.user === "595984848082") {
-        logger.info("Message is from target number, processing with AI");
+        console.log('¡NÚMERO OBJETIVO DETECTADO! Procesando con IA...');
         
         try {
+          console.log('Llamando a processOpenAIMessage...');
           const aiResponse = await processOpenAIMessage(msg.body);
-          logger.info("AI Response:", aiResponse);
+          console.log('Respuesta de IA recibida:', aiResponse);
 
           // Enviar respuesta
           const chatId = `${contact.id.user}@c.us`;
+          console.log('Intentando enviar respuesta a:', chatId);
+          
           await wbot.sendMessage(chatId, `\u200e${aiResponse}`);
-          logger.info("AI response sent successfully");
+          console.log('¡Respuesta enviada exitosamente!');
         } catch (error) {
-          logger.error("Error processing AI message:", error);
+          console.error('ERROR al procesar/enviar mensaje de IA:', error);
         }
       } else {
-        logger.info("Message is not from target number, skipping AI processing");
+        console.log('Mensaje no es del número objetivo, ignorando');
       }
 
     } catch (err) {
-      logger.error("Error processing message:", err);
-      Sentry.captureException(err);
+      console.error('ERROR al procesar mensaje:', err);
     }
   });
 
-  logger.info("Message listener initialized successfully");
+  console.log('Listener de mensajes inicializado correctamente');
 };
