@@ -135,50 +135,52 @@ const verifyMediaMessage = async (
 };
 
 const processOpenAIMessage = async (msg: string): Promise<string> => {
-  logger.info('Starting OpenAI message processing');
+  console.log('\n=== Starting OpenAI Message Processing ===');
+  console.log('Received message:', msg);
+  
   try {
-    logger.debug('Fetching OpenAI settings from database');
+    console.log('Fetching OpenAI settings from database...');
     const settings = await Setting.findOne({
       where: { key: 'openai' }
     });
 
     if (!settings) {
-      logger.error('Settings not found in database');
+      console.log('No settings found in database');
       return "OpenAI configuration not found";
     }
 
-    logger.debug('Raw settings value:', settings.value);
+    console.log('Raw settings from database:', settings.value);
+    
     let parsedSettings;
     try {
       parsedSettings = JSON.parse(settings.value);
-      logger.info('Parsed OpenAI Settings:', {
-        model: parsedSettings.model,
+      console.log('Parsed settings:', {
         hasKey: !!parsedSettings.key,
-        hasSystemMessage: !!parsedSettings.systemMessage,
-        keyLength: parsedSettings.key ? parsedSettings.key.length : 0
+        model: parsedSettings.model,
+        hasSystemMessage: !!parsedSettings.systemMessage
       });
     } catch (parseError) {
-      logger.error('Error parsing settings JSON:', parseError);
-      return "Error in OpenAI configuration format";
+      console.error('Error parsing settings:', parseError);
+      return "Error parsing OpenAI configuration";
     }
 
     const { key, model, systemMessage } = parsedSettings;
 
     if (!key) {
-      logger.error('API key is missing in settings');
+      console.log('API key is missing in settings');
       return "OpenAI API key not configured";
     }
 
-    logger.info('Initializing OpenAI client');
-    const openai = new OpenAI({ apiKey: key });
-
-    logger.info('Sending request to OpenAI', {
+    console.log('Initializing OpenAI with config:', {
       model: model || 'gpt-3.5-turbo',
       messageLength: msg.length,
-      hasSystemMessage: !!systemMessage
+      keyLength: key.length
     });
 
+    const openai = new OpenAI({ apiKey: key });
+
     try {
+      console.log('Sending request to OpenAI...');
       const completion = await openai.chat.completions.create({
         messages: [
           { role: 'system', content: systemMessage || 'Eres un asistente amable y profesional.' },
@@ -189,38 +191,29 @@ const processOpenAIMessage = async (msg: string): Promise<string> => {
         max_tokens: 500
       });
 
-      logger.info('Received response from OpenAI', {
+      console.log('Received response from OpenAI:', {
         hasChoices: !!completion.choices,
-        choicesLength: completion.choices?.length,
-        responseLength: completion.choices?.[0]?.message?.content?.length
+        choicesLength: completion.choices?.length
       });
 
-      if (!completion.choices || !completion.choices[0]) {
-        logger.error('Invalid response structure:', completion);
-        return "Error: Invalid response from AI";
-      }
-
-      const response = completion.choices[0].message.content || "No response generated";
-      logger.info('Successfully processed OpenAI response');
+      const response = completion.choices[0]?.message?.content || "No response generated";
+      console.log('Final response:', response);
       return response;
 
     } catch (apiError: any) {
-      logger.error('OpenAI API Error:', {
-        error: apiError.message,
+      console.error('OpenAI API Error:', {
+        message: apiError.message,
         type: apiError.type,
-        status: apiError.status,
         stack: apiError.stack
       });
       return `Error calling OpenAI API: ${apiError.message}`;
     }
-
   } catch (error: any) {
-    logger.error('Unexpected error in processOpenAIMessage:', {
-      error: error.message,
-      stack: error.stack,
-      type: typeof error
+    console.error('Unexpected error:', {
+      message: error.message,
+      stack: error.stack
     });
-    return `Error processing message with AI: ${error.message || 'Unknown error'}`;
+    return `Error processing message with AI: ${error.message}`;
   }
 };
 
