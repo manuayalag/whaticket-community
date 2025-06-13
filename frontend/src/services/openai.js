@@ -1,8 +1,4 @@
-import axios from "axios";
-
-const api = axios.create({
-  baseURL: process.env.REACT_APP_BACKEND_URL,
-});
+import api from "./api";
 
 export const getOpenAISettings = async () => {
   const { data } = await api.get("/openai/settings");
