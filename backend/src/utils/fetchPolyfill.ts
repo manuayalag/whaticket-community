@@ -36,4 +36,8 @@ if (fetchImplementation && !globalThis.fetch) {
   globalThis.fetch = fetchImplementation as any;
 }
 
+if (fetchImplementation && fetchImplementation.Headers && !globalThis.Headers) {
+  globalThis.Headers = fetchImplementation.Headers;
+}
+
 export default fetchImplementation;
