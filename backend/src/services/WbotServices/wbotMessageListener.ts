@@ -9,6 +9,13 @@ import {
   Message as WbotMessage,
   Client
 } from "whatsapp-web.js";
+import Ticket from "../../models/Ticket";
+import CreateMessageService from "../MessageServices/CreateMessageService";
+import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
+import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
+import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
+import { logger } from "../../utils/logger";
+import { Op } from "sequelize";
 
 // Set fetch globally for OpenAI
 if (!globalThis.fetch) {
@@ -27,7 +34,6 @@ export const wbotMessageListener = (wbot: Session): void => {
   logToFile("=========================================");
   logToFile("INICIANDO LISTENER DE MENSAJES");
   logToFile("=========================================");
-
   // Process only messages from our target
   wbot.on("message", async (msg) => {
     try {
@@ -40,6 +46,53 @@ export const wbotMessageListener = (wbot: Session): void => {
 
       // Always process the message in the system but only use OpenAI for target number
       const isTargetNumber = contactNumber === TARGET_NUMBER;
+      
+      // Variable para mantener referencia al contacto para uso posterior
+      let contact;
+        // Procesar el mensaje para crear un ticket y guardar el mensaje
+      try {
+        const whatsappId = (wbot as any).id;
+        if (!whatsappId) {
+          logToFile("ERROR: No se pudo obtener el ID de WhatsApp");
+          return;
+        }
+          // Encontrar o crear el contacto
+        contact = await CreateOrUpdateContactService({
+          name: contactNumber, // Usamos el número como nombre si no hay otro disponible
+          number: contactNumber,
+          profilePicUrl: "",
+          isGroup: false // Asumimos que no es grupo para simplificar
+        });
+
+        logToFile(`Contacto encontrado/creado: ${contact.name}`);
+        
+        // Encontrar o crear el ticket
+        const ticket = await FindOrCreateTicketService(
+          contact,
+          whatsappId,
+          1,
+          undefined // No soportamos grupos en esta implementación simple
+        );
+
+        logToFile(`Ticket encontrado/creado: ${ticket.id}`);
+        
+        // Crear el mensaje en la base de datos
+        const messageData = {
+          id: msg.id.id,
+          ticketId: ticket.id,
+          contactId: msg.fromMe ? undefined : contact.id,
+          body: msg.body,
+          fromMe: msg.fromMe,
+          mediaType: "chat", // Simplificado a solo chat
+          read: msg.fromMe,
+        };
+
+        await CreateMessageService({ messageData });
+        logToFile("Mensaje guardado en la base de datos");
+      } catch (err) {
+        logToFile(`ERROR al guardar mensaje/ticket: ${err}`);
+        console.error(err);
+      }
       
       if (isTargetNumber) {
         logToFile("¡MENSAJE DE NÚMERO OBJETIVO DETECTADO!");
@@ -88,8 +141,42 @@ export const wbotMessageListener = (wbot: Session): void => {
           logToFile(`Respuesta de OpenAI: ${response}`);
 
           logToFile("Enviando respuesta al usuario...");
-          await wbot.sendMessage(msg.from, `\u200e${response}`);
+          const sentMessage = await wbot.sendMessage(msg.from, `\u200e${response}`);
           logToFile("Respuesta enviada exitosamente");
+            // Guardar la respuesta del bot como mensaje
+          try {            // Verificamos que el contacto exista
+            if (!contact) {
+              logToFile("ERROR: No hay contacto para guardar la respuesta");
+              return;
+            }
+            
+            const ticket = await Ticket.findOne({
+              where: {
+                status: {
+                  [Op.or]: ["open", "pending"]
+                },
+                contactId: contact.id,
+                whatsappId: (wbot as any).id
+              },
+              order: [["updatedAt", "DESC"]]
+            });
+            
+            if (ticket) {
+              const messageData = {
+                id: sentMessage.id.id,
+                ticketId: ticket.id,
+                body: response,
+                fromMe: true,
+                mediaType: "chat",
+                read: true
+              };
+              
+              await CreateMessageService({ messageData });
+              logToFile("Respuesta guardada en la base de datos");
+            }
+          } catch (err) {
+            logToFile(`ERROR al guardar respuesta: ${err}`);
+          }
 
         } catch (error: any) {
           logToFile(`ERROR al procesar con OpenAI: ${error?.message || 'Error desconocido'}`);
@@ -98,7 +185,8 @@ export const wbotMessageListener = (wbot: Session): void => {
           } catch (sendError: any) {
             logToFile(`ERROR al enviar mensaje de error: ${sendError?.message || 'Error desconocido'}`);
           }
-        }      } else {
+        }
+      } else {
         logToFile("Mensaje recibido correctamente - No es del número objetivo, no se procesará con IA pero se registrará en el sistema");
       }
       
