@@ -36,6 +36,9 @@ RUN chmod +x fix-typescript.sh && ./fix-typescript.sh
 # Instalar tipos de declaración de node-fetch
 RUN npm install --save-dev @types/node-fetch@2.6.4
 
+# Install mariadb package
+RUN npm install mariadb
+
 # Create logs directory with correct permissions
 RUN mkdir -p /usr/src/app/logs && chmod -R 777 /usr/src/app/logs
 
