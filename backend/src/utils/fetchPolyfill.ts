@@ -36,7 +36,7 @@ if (fetchImplementation && !globalThis.fetch) {
   globalThis.fetch = fetchImplementation as any;
 }
 
-if (fetchImplementation && fetchImplementation.Headers && !globalThis.Headers) {
+if (fetchImplementation && fetchImplementation.Headers) {
   globalThis.Headers = fetchImplementation.Headers;
 }
 
