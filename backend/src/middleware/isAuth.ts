@@ -1,3 +1,4 @@
+import '../utils/fetchPolyfill';
 import { verify } from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 

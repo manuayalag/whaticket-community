@@ -1,3 +1,4 @@
+import '../utils/fetchPolyfill';
 import { Request, Response, NextFunction } from "express";
 
 import AppError from "../errors/AppError";
