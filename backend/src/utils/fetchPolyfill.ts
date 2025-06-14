@@ -30,7 +30,6 @@ try {
     console.error("Error al importar node-fetch dinámicamente:", dynamicError);
   }
 }
-
 // Asignar a globalThis solo si fetch no está ya definido
 if (fetchImplementation && !globalThis.fetch) {
   globalThis.fetch = fetchImplementation as any;

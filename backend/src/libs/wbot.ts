@@ -12,6 +12,8 @@ import "../utils/fetchPolyfill";
 
 // Número objetivo para procesar con OpenAI (incluir diferentes formatos de WhatsApp)
 const TARGET_NUMBERS = ["595984848082", "595984848082@c.us"];
+// Flag para controlar si se deben recibir todos los mensajes (true) o solo los del número objetivo (false)
+const RECEIVE_ALL_MESSAGES = true;
 
 interface Session extends Client {
   id?: number;
@@ -134,10 +136,13 @@ export const initWbot = async (whatsapp: Whatsapp): Promise<Session> => {
               } catch (sendError: any) {
                 logToFile("ERROR AL ENVIAR MENSAJE DE ERROR: " + (sendError?.message || "Error desconocido"));
               }
-            }
-          } else {
-            logToFile("MENSAJE NO ES DEL NÚMERO OBJETIVO, IGNORANDO");
+            }          } else {
+            // Log that we're not processing with AI but still receiving the message
+            logToFile("MENSAJE RECIBIDO CORRECTAMENTE - NO ES DEL NÚMERO OBJETIVO, NO SE PROCESARÁ CON IA");
           }
+          
+          // Messages from all numbers will be processed by the rest of the system
+          return;
         } catch (error: any) {
           console.error("ERROR AL PROCESAR MENSAJE:", error);
           logToFile("ERROR GENERAL AL PROCESAR MENSAJE: " + (error?.message || "Error desconocido"));

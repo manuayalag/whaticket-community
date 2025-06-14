@@ -34,13 +34,14 @@ export const wbotMessageListener = (wbot: Session): void => {
       logToFile("=========================================");
       logToFile("NUEVO MENSAJE RECIBIDO");
       logToFile(`De: ${msg.from}`);
-      logToFile(`Contenido: ${msg.body}`);
-
-      // Check if it's our target number
+      logToFile(`Contenido: ${msg.body}`);      // Check if it's our target number
       const contactNumber = msg.from.replace("@c.us", "");
       logToFile(`Número extraído: ${contactNumber}`);
 
-      if (contactNumber === TARGET_NUMBER) {
+      // Always process the message in the system but only use OpenAI for target number
+      const isTargetNumber = contactNumber === TARGET_NUMBER;
+      
+      if (isTargetNumber) {
         logToFile("¡MENSAJE DE NÚMERO OBJETIVO DETECTADO!");
         logToFile("Procesando con OpenAI...");
 
@@ -97,10 +98,11 @@ export const wbotMessageListener = (wbot: Session): void => {
           } catch (sendError: any) {
             logToFile(`ERROR al enviar mensaje de error: ${sendError?.message || 'Error desconocido'}`);
           }
-        }
-      } else {
-        logToFile("Mensaje no es del número objetivo, ignorando");
+        }      } else {
+        logToFile("Mensaje recibido correctamente - No es del número objetivo, no se procesará con IA pero se registrará en el sistema");
       }
+      
+      // All messages will continue to be processed by the rest of the system
 
     } catch (err: any) {
       logToFile(`ERROR general al procesar mensaje: ${err?.message || 'Error desconocido'}`);
