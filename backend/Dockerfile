@@ -25,6 +25,10 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm install
 
+# Copiar script de actualización de node-fetch
+COPY update-node-fetch.sh ./
+RUN chmod +x update-node-fetch.sh && ./update-node-fetch.sh
+
 # Create logs directory with correct permissions
 RUN mkdir -p /usr/src/app/logs && chmod -R 777 /usr/src/app/logs
 

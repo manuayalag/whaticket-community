@@ -4,11 +4,11 @@ networks:
   whaticket:
 
 services:
-
   backend:
     build:
       context: ./backend
-      dockerfile: ./Dockerfile    environment:
+      dockerfile: ./Dockerfile
+    environment:
       - DB_HOST=mysql
       - DB_USER=root
       - DB_PASS=${MYSQL_ROOT_PASSWORD:-strongpassword}
@@ -19,7 +19,8 @@ services:
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - PROXY_PORT=${PROXY_PORT:-8080}
       - CHROME_ARGS=--no-sandbox --disable-setuid-sandbox
-      - LOG_FILE_PATH=/usr/src/app/logs/debug.logports:
+      - LOG_FILE_PATH=/usr/src/app/logs/debug.log
+    ports:
       - ${BACKEND_PORT:-8082}:3000
     volumes:
       - ./backend/public/:/usr/src/app/public/
@@ -45,10 +46,9 @@ services:
       - ./ssl/www/:/var/www/letsencrypt/
     networks:
       - whaticket
-
   mysql:
     image: ${MYSQL_ENGINE:-mariadb}:${MYSQL_VERSION:-10.6}
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_bin    
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_bin
     volumes:
       - ./.docker/data/:/var/lib/mysql
     environment:

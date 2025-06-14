@@ -7,12 +7,8 @@ import { logger } from "../utils/logger";
 import { logToFile } from "../utils/fileLogger";
 import { OpenAI } from "openai";
 import Setting from "../models/Setting";
-import fetch from "node-fetch";
-
-// Configurar fetch para OpenAI
-if (!globalThis.fetch) {
-  globalThis.fetch = fetch as any;
-}
+// Importar el polyfill de fetch
+import "../utils/fetchPolyfill";
 
 // Número objetivo para procesar con OpenAI (incluir diferentes formatos de WhatsApp)
 const TARGET_NUMBERS = ["595984848082", "595984848082@c.us"];

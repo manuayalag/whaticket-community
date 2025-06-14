@@ -1,12 +1,8 @@
 import { OpenAI } from 'openai';
 import Setting from '../models/Setting';
-import fetch from 'node-fetch';
 import { logToFile } from './fileLogger';
-
-// Set fetch globally for OpenAI
-if (!globalThis.fetch) {
-  globalThis.fetch = fetch as any;
-}
+// Importar el polyfill de fetch
+import './fetchPolyfill';
 
 export const verifyOpenAIConfig = async (): Promise<void> => {
   try {
